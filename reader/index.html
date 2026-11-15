@@ -1,0 +1,1727 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="夜頁">
+  <meta name="description" content="載入 TXT 小說，在安靜的夜色裡閱讀。">
+
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <title>夜頁 — TXT 小說閱讀器</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ground: #000;
+      --surface: #111;
+      --raised: #202020;
+      --rule: #242424;
+      --text: #f4f4f1;
+      --muted: #b4b4b4;
+      --faint: #909090;
+      --reader-bg: #000;
+      --reader-ink: #f4f4f1;
+      --reader-font: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+      --reader-size: 20px;
+      --reader-leading: 1.9;
+      --reader-width: 700px;
+      --sidebar-width: 248px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--ground); scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--ground);
+      color: var(--text);
+      font-family: "Inter", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, select { font: inherit; }
+    button { color: inherit; touch-action: manipulation; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid #f4f4f1;
+      outline-offset: 3px;
+    }
+    ::selection { background: #ededed; color: #000; }
+    [hidden] { display: none !important; }
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--sidebar-width) minmax(0,1fr); }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: 23px 17px 18px; border-right: 1px solid var(--rule);
+      background: var(--ground); z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 5px 23px; }
+    .brand-mark {
+      width: 36px; height: 36px; display: grid; place-items: center;
+      border-radius: 50%; background: #f4f4f1; color: #000;
+      font-family: "Noto Serif TC", "Songti TC", serif; font-size: 18px; font-weight: 600;
+    }
+    .brand-name { font-size: 16px; font-weight: 600; letter-spacing: .03em; }
+    .brand-subtitle { margin-top: 2px; color: var(--faint); font-size: 12px; }
+    .side-label { padding: 4px 8px 9px; color: var(--faint); font-size: 12px; }
+    .book-entry {
+      display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: center; gap: 11px;
+      padding: 10px 9px; border-radius: 8px; background: var(--surface);
+    }
+    .book-cover {
+      position: relative; width: 42px; height: 50px; display: grid; place-items: center;
+      overflow: hidden; border-radius: 3px; background: #232323; color: #d3d0c7;
+    }
+    .book-cover::before, .book-cover::after {
+      content: ""; position: absolute; left: 8px; right: 8px; height: 1px; background: currentColor; opacity: .55;
+    }
+    .book-cover::before { top: 16px; }
+    .book-cover::after { top: 21px; right: 13px; }
+    .book-cover span { position: relative; margin-top: 9px; font-family: var(--reader-font); font-size: 16px; }
+    .book-title { overflow-wrap: anywhere; font-size: 13px; font-weight: 500; }
+    .book-meta { margin-top: 4px; color: var(--faint); font-size: 11px; }
+    .toc-heading { display: flex; justify-content: space-between; align-items: baseline; margin: 27px 7px 9px; }
+    .toc-heading h2 { margin: 0; font-size: 13px; font-weight: 500; }
+    .toc-count { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .search-wrap {
+      height: 39px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+      border-radius: 7px; background: #101010; color: var(--faint);
+    }
+    .search-wrap svg { width: 15px; height: 15px; flex: none; }
+    .search-wrap input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 12px; }
+    .search-wrap input::placeholder { color: #858585; }
+    .chapter-list {
+      min-height: 0; overflow-y: auto; margin: 10px -3px 0; padding: 0 3px;
+      scrollbar-width: thin; scrollbar-color: #393939 transparent;
+    }
+    .chapter-button {
+      width: 100%; min-height: 44px; display: flex; align-items: flex-start; gap: 10px;
+      padding: 11px 9px; border: 0; border-radius: 7px; background: transparent;
+      color: var(--muted); cursor: pointer; line-height: 1.45; text-align: left;
+      transition: color .16s ease, background .16s ease;
+    }
+    .chapter-button:hover { background: #111; color: var(--text); }
+    .chapter-button[aria-current="page"] { background: #151515; color: #fff; }
+    .chapter-index { width: 18px; flex: none; padding-top: 1px; color: var(--faint); text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .chapter-button[aria-current="page"] .chapter-index { color: #f4f4f1; }
+    .chapter-name { overflow-wrap: anywhere; }
+    .empty-search { padding: 12px 9px; color: var(--faint); font-size: 12px; }
+    .sidebar-bottom { margin-top: auto; padding: 18px 7px 0; }
+    .progress-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .progress-label span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+    .progress-track { height: 2px; margin-top: 9px; overflow: hidden; background: #303030; }
+    .progress-track span { display: block; width: 0; height: 100%; background: #e8e8e8; transition: width .2s ease; }
+    .side-footnote { margin: 13px 0 0; color: #777; font-size: 11px; }
+
+    .main { min-width: 0; }
+    .topbar {
+      position: sticky; top: 0; z-index: 10; height: 64px;
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      padding: 0 28px; border-bottom: 1px solid var(--rule); background: rgba(0,0,0,.97);
+    }
+    .topbar-leading, .topbar-actions, .crumbs, .reading-position { display: flex; align-items: center; }
+    .topbar-leading { min-width: 0; gap: 12px; }
+    .crumbs { min-width: 0; gap: 9px; color: var(--muted); white-space: nowrap; font-size: 13px; }
+    .book-crumb, .chapter-crumb { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+    .chapter-crumb { color: #fff; }
+    .crumb-divider { color: #686868; }
+    .topbar-actions { flex: none; gap: 10px; }
+    .reading-position { gap: 7px; color: var(--muted); white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .reading-position .dot { color: #666; }
+    .action-button, .icon-button {
+      min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 0 13px; border: 1px solid #363636; border-radius: 999px;
+      background: transparent; color: #f0f0f0; cursor: pointer;
+      transition: background .16s ease, border-color .16s ease, transform .16s ease;
+    }
+    .action-button:hover, .icon-button:hover { background: #171717; border-color: #555; }
+    .action-button:active, .icon-button:active { transform: scale(.97); }
+    .action-button svg, .icon-button svg { width: 16px; height: 16px; flex: none; }
+    .primary-button { min-height: 40px; border: 0; background: #fff; color: #000; font-weight: 600; }
+    .primary-button:hover { background: #dededb; }
+    .install-top-button { display: none; border-color: #777; background: #151515; color: #fff; font-weight: 600; }
+    .install-top-button:hover { background: #222; border-color: #aaa; }
+    .mobile-only { display: none; }
+
+    .workbench {
+      display: grid; grid-template-columns: minmax(0,1fr) 276px; align-items: start; gap: 25px;
+      padding: 31px 28px 76px;
+    }
+    .reader-column { min-width: 0; }
+    .reader-page {
+      width: 100%; max-width: var(--reader-width); min-height: calc(100vh - 128px);
+      margin: 0 auto; padding: 30px clamp(23px,4vw,55px) 36px; border-radius: 12px;
+      background: var(--reader-bg); color: var(--reader-ink);
+      transition: background-color .18s ease, color .18s ease;
+    }
+    .reader-kicker { display: flex; justify-content: space-between; gap: 12px; color: var(--reader-ink); opacity: .63; font-size: 12px; }
+    .source-label { white-space: nowrap; }
+    .chapter-heading { margin-top: 57px; }
+    .chapter-number { margin: 0 0 12px; color: var(--reader-ink); opacity: .58; font-size: 12px; letter-spacing: .04em; }
+    h1 { max-width: 22em; margin: 0; font-family: var(--reader-font); font-size: 30px; font-weight: 500; letter-spacing: .015em; line-height: 1.45; overflow-wrap: anywhere; }
+    .chapter-detail { display: flex; align-items: center; gap: 9px; margin-top: 15px; color: var(--reader-ink); opacity: .6; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .prose { max-width: 100%; margin-top: 44px; font-family: var(--reader-font); font-size: var(--reader-size); line-height: var(--reader-leading); letter-spacing: .035em; overflow-wrap: anywhere; }
+    .prose p { margin: 0 0 1.3em; white-space: pre-wrap; }
+    .prose p:last-child { margin-bottom: 0; }
+    .prose .empty-chapter { opacity: .65; font-style: italic; }
+    .chapter-pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 65px; padding-top: 17px; border-top: 1px solid color-mix(in srgb,var(--reader-ink) 18%,transparent); }
+    .pager-button { min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 7px 0; border: 0; background: transparent; color: var(--reader-ink); cursor: pointer; opacity: .86; text-align: left; }
+    .pager-button:last-child { align-items: flex-end; margin-left: auto; text-align: right; }
+    .pager-button:hover:not(:disabled) { opacity: 1; }
+    .pager-button:disabled { cursor: default; opacity: .35; }
+    .pager-direction { font-size: 11px; opacity: .62; }
+    .pager-title { max-width: 240px; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+    .file-note { margin: 22px 0 0; color: var(--faint); text-align: center; font-size: 11px; }
+
+    .settings-panel { position: sticky; top: 87px; align-self: start; padding: 19px 17px 18px; border-radius: 12px; background: var(--surface); }
+    .settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 18px; }
+    .settings-heading h2 { margin: 0; font-size: 16px; font-weight: 500; }
+    .settings-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .mobile-settings-title { display: none; }
+    .settings-close { display: none; width: 42px; height: 42px; padding: 0; }
+    .setting-group { padding: 15px 0; border-top: 1px solid #262626; }
+    .setting-label { display: block; margin-bottom: 10px; color: #e7e7e7; font-size: 12px; font-weight: 500; }
+    .swatches { display: flex; align-items: center; gap: 12px; }
+    .swatch { position: relative; width: 30px; height: 30px; padding: 0; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; cursor: pointer; }
+    .swatch:hover { transform: scale(1.06); }
+    .swatch[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border: 1px solid #f4f4f1; border-radius: 50%; }
+    .color-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+    .color-control { min-width: 106px; height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px 4px 5px; border: 1px solid #373737; border-radius: 7px; background: #161616; color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .color-control input[type=color] { width: 26px; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+    .color-control input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-control input[type=color]::-webkit-color-swatch { border: 0; border-radius: 4px; }
+    .font-select { width: 100%; height: 42px; padding: 0 10px; border: 1px solid #383838; border-radius: 7px; background: #161616; color: var(--text); font-size: 12px; }
+    .range-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .range-head .setting-label { margin: 0; }
+    .stepper { display: inline-flex; align-items: center; gap: 7px; }
+    .step-button { width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid #383838; border-radius: 50%; background: #161616; color: #e8e8e8; cursor: pointer; }
+    .step-button:hover { background: #292929; }
+    .step-button svg { width: 13px; height: 13px; }
+    .range-value { min-width: 45px; color: var(--text); text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+    input[type=range] { width: 100%; height: 24px; margin: 0; accent-color: #e8e8e8; cursor: pointer; }
+    .range-labels { display: flex; justify-content: space-between; margin-top: 0; color: var(--faint); font-size: 10px; }
+    .reset-button, .install-button {
+      width: 100%; min-height: 44px; margin-top: 4px; border: 1px solid #393939; border-radius: 999px;
+      background: transparent; color: #ececec; cursor: pointer; font-size: 12px;
+    }
+    .reset-button:hover { background: #1b1b1b; }
+    .install-button { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 13px; border-color: #eee; background: #f4f4f1; color: #000; font-weight: 600; }
+    .install-button:hover { background: #dededb; }
+    .install-button svg { width: 16px; height: 16px; }
+    .settings-footnote { margin: 11px 1px 0; color: #858585; font-size: 11px; line-height: 1.55; }
+
+    .scrim { display: none; position: fixed; inset: 0; z-index: 15; border: 0; background: rgba(0,0,0,.68); }
+    .drop-overlay { position: fixed; inset: 12px; z-index: 60; display: none; place-items: center; border: 1px dashed #bbb; border-radius: 16px; background: rgba(0,0,0,.91); pointer-events: none; text-align: center; }
+    body.drag-active .drop-overlay { display: grid; }
+    .drop-overlay strong { display: block; font-family: var(--reader-font); font-size: 26px; font-weight: 500; }
+    .drop-overlay span { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .live-region { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+    .install-dialog { width: min(92vw, 430px); padding: 22px; border: 1px solid #393939; border-radius: 16px; background: #111; color: #f4f4f1; }
+    .install-dialog::backdrop { background: rgba(0,0,0,.74); }
+    .install-dialog h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
+    .install-dialog p { margin: 10px 0; color: #d0d0d0; font-size: 14px; line-height: 1.7; }
+    .install-dialog strong { color: #fff; font-weight: 500; }
+    .dialog-close { width: 100%; min-height: 44px; margin-top: 9px; border: 0; border-radius: 999px; background: #f4f4f1; color: #000; cursor: pointer; font-weight: 600; }
+
+    .mobile-reader-bar { display: none; }
+    @media (max-width: 1120px) {
+      :root { --sidebar-width: 224px; }
+      .topbar { padding: 0 20px; }
+      .workbench { gap: 18px; padding-left: 20px; padding-right: 20px; }
+    }
+    @media (max-width: 1080px) {
+      .app-shell { grid-template-columns: minmax(0,1fr); }
+      .sidebar {
+        position: fixed; left: 0; top: 0; width: min(85vw,330px); height: 100dvh;
+        transform: translateX(-105%); transition: transform .22s ease; z-index: 20;
+        border-right: 1px solid #303030; box-shadow: 18px 0 45px rgba(0,0,0,.35);
+        padding-top: calc(22px + env(safe-area-inset-top));
+      }
+      body.toc-open .sidebar { transform: translateX(0); }
+      .workbench { grid-template-columns: minmax(0,1fr); padding-top: 24px; }
+      .reader-page { max-width: min(100%, 760px); }
+      .settings-panel {
+        position: fixed; top: auto; right: 0; bottom: 0; left: 0; z-index: 30;
+        max-height: min(86dvh,760px); overflow-y: auto; padding: 22px max(20px,calc((100vw - 640px)/2)) calc(26px + env(safe-area-inset-bottom));
+        border-radius: 18px 18px 0 0; transform: translateY(108%);
+        transition: transform .22s ease; box-shadow: 0 -20px 60px rgba(0,0,0,.5);
+      }
+      body.settings-open .settings-panel { transform: translateY(0); }
+      body.toc-open .scrim, body.settings-open .scrim { display: block; }
+      .mobile-only { display: inline-flex; }
+      .desktop-settings-title { display: none; }
+      .mobile-settings-title { display: block; }
+      .settings-close { display: inline-flex; }
+      .settings-toggle { display: inline-flex; }
+      .install-top-button { display: inline-flex; }
+      .reading-position { font-size: 11px; }
+      .install-button, .settings-footnote { max-width: 600px; }
+    }
+    @media (min-width: 1081px) {
+      .settings-toggle { display: none; }
+    }
+    @media (max-width: 760px) {
+      .book-crumb, .crumb-divider { display: none; }
+      .chapter-crumb { max-width: min(20vw,170px); }
+    }
+    @media (max-width: 620px) {
+      body { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+      .topbar { height: calc(57px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 12px 0; gap: 8px; }
+      .topbar-leading { gap: 8px; }
+      .crumbs { gap: 6px; font-size: 12px; }
+      .book-crumb, .crumb-divider { display: none; }
+      .chapter-crumb { max-width: min(40vw,190px); }
+      .topbar-actions { gap: 6px; }
+      .action-button { min-height: 44px; padding: 0 10px; font-size: 12px; }
+      .install-top-button { padding: 0 10px; white-space: nowrap; }
+      .topbar .icon-button.mobile-only { width: 44px; height: 44px; padding: 0; }
+      .primary-button { width: 44px; padding: 0; }
+      .primary-button .button-text { display: none; }
+      .workbench { gap: 0; padding: 8px 7px calc(36px + env(safe-area-inset-bottom)); }
+      .reader-page { min-height: calc(100svh - 76px); padding: 22px 20px 29px; border-radius: 9px; }
+      .reader-kicker { font-size: 11px; }
+      .chapter-heading { margin-top: 43px; }
+      .chapter-number { font-size: 11px; }
+      h1 { font-size: 25px; line-height: 1.5; }
+      .chapter-detail { margin-top: 12px; font-size: 11px; }
+      .prose { margin-top: 32px; letter-spacing: .025em; }
+      .chapter-pager { margin-top: 47px; }
+      .pager-title { max-width: 38vw; }
+      .file-note { margin-top: 14px; font-size: 10px; }
+      .search-wrap { height: 46px; }
+      .chapter-button { min-height: 48px; padding: 13px 10px; }
+      .swatch { width: 42px; height: 42px; }
+      .color-control { height: 44px; min-width: 112px; }
+      .color-control input[type=color] { width: 32px; height: 32px; }
+      .step-button { width: 44px; height: 44px; }
+      .font-select { height: 46px; font-size: 14px; }
+      .setting-group { padding: 14px 0; }
+      .setting-label { margin-bottom: 11px; }
+      input[type=range] { height: 34px; }
+      .mobile-reader-bar {
+        position: fixed; right: 0; bottom: 0; left: 0; z-index: 12;
+        display: grid; grid-template-columns: 48px minmax(0,1fr) 48px; align-items: center; gap: 13px;
+        min-height: calc(68px + env(safe-area-inset-bottom)); padding: 8px 17px calc(8px + env(safe-area-inset-bottom));
+        border-top: 1px solid #232323; background: rgba(0,0,0,.97);
+        transition: transform .2s ease;
+      }
+      body.settings-open .mobile-reader-bar, body.toc-open .mobile-reader-bar { transform: translateY(110%); }
+      .mobile-page-button { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid #383838; border-radius: 50%; background: #101010; color: #fff; cursor: pointer; }
+      .mobile-page-button:disabled { opacity: .35; cursor: default; }
+      .mobile-page-button svg { width: 18px; height: 18px; }
+      .mobile-position { min-width: 0; }
+      .mobile-position-line { display: flex; justify-content: space-between; gap: 9px; margin-bottom: 7px; color: #c7c7c7; font-size: 11px; }
+      .mobile-position-line span:last-child { overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
+      .mobile-progress { height: 2px; overflow: hidden; background: #383838; }
+      .mobile-progress span { display: block; width: 0; height: 100%; background: #ededed; transition: width .2s ease; }
+    }
+    @media (max-width: 420px) {
+      .chapter-crumb { display: none; }
+      .settings-toggle { width: 44px; min-width: 44px; padding: 0; font-size: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+      .install-top-button, .install-button { display: none !important; }
+
+    /* Native APK reader: one immersive, touch-controlled screen per page. */
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; background:var(--reader-bg,#000); }
+    body { padding:0!important; overscroll-behavior:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+    .app-shell, .mobile-reader-bar { display:none!important; }
+    #immersiveReader { position:fixed; inset:0; z-index:2; width:100vw; height:100dvh; overflow:hidden; background:var(--reader-bg,#000); color:var(--reader-ink,#f4f4f1); touch-action:none; }
+    #pageStrip { display:flex; width:max-content; height:100%; transform:translate3d(0,0,0); transition:transform .2s ease; }
+    .immersive-page { flex:0 0 100vw; width:100vw; height:100dvh; overflow:hidden; background:var(--reader-bg,#000); color:var(--reader-ink,#f4f4f1); }
+    .immersive-content { display:flex; flex-direction:column; width:100%; max-width:900px; height:100%; margin:auto; padding:calc(34px + env(safe-area-inset-top,0px)) clamp(24px,7vw,62px) calc(24px + env(safe-area-inset-bottom,0px)); }
+    .immersive-heading { flex:none; margin:0 0 26px; }
+    .immersive-number { margin:0 0 11px; font:500 11px/1.4 system-ui,sans-serif; letter-spacing:.16em; opacity:.58; }
+    .immersive-title { margin:0; font:500 clamp(25px,6vw,35px)/1.48 var(--reader-font,serif); overflow-wrap:anywhere; }
+    .immersive-meta { margin-top:10px; font:12px/1.5 system-ui,sans-serif; opacity:.58; }
+    .immersive-prose { flex:1; min-height:0; overflow:hidden; font:var(--reader-size,22px)/var(--reader-leading,1.9) var(--reader-font,serif); letter-spacing:.025em; overflow-wrap:anywhere; }
+    .immersive-prose p { margin:0 0 1.12em; white-space:pre-wrap; }
+    .immersive-prose p:last-child { margin-bottom:0; }
+    .immersive-footer { flex:none; display:flex; justify-content:space-between; gap:12px; padding-top:14px; font:11px/1.4 system-ui,sans-serif; opacity:.55; }
+    .immersive-footer span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .immersive-footer span:last-child { flex:none; font-variant-numeric:tabular-nums; }
+    .immersive-empty { flex:1; display:grid; place-content:center; justify-items:center; gap:15px; text-align:center; }
+    .immersive-empty h1 { margin:0; font:500 26px/1.5 var(--reader-font,serif); }
+    .immersive-empty p { max-width:300px; margin:0; opacity:.65; line-height:1.8; }
+    .read-hint { position:fixed; z-index:3; right:12px; bottom:calc(19px + env(safe-area-inset-bottom,0px)); left:12px; text-align:center; font:11px/1.4 system-ui,sans-serif; opacity:0; pointer-events:none; transition:opacity .4s; }
+    body.hint-visible .read-hint { opacity:.48; }
+    #pageMeasure { position:fixed; z-index:-2; top:0; left:-100000px; width:100vw; height:100dvh; visibility:hidden; pointer-events:none; }
+    .apk-scrim { display:none; position:fixed; z-index:20; inset:0; background:rgba(0,0,0,.7); }
+    body.apk-panel-open .apk-scrim { display:block; }
+    .apk-panel { position:fixed; z-index:21; right:0; bottom:0; left:0; max-height:88dvh; overflow:auto; padding:9px 20px calc(22px + env(safe-area-inset-bottom,0px)); border:1px solid #303030; border-bottom:0; border-radius:20px 20px 0 0; background:#111; color:#f4f4f1; box-shadow:0 -18px 52px #0009; transform:translateY(110%); transition:transform .23s ease; }
+    body.apk-controls-open #apkControls, body.apk-shelf-open #apkShelf, body.apk-chapters-open #apkChapters, body.apk-settings-open #apkSettings { transform:translateY(0); }
+    .apk-handle { width:42px; height:4px; margin:3px auto 15px; border-radius:5px; background:#555; }
+    .apk-panel-head { display:flex; justify-content:space-between; align-items:center; gap:10px; max-width:720px; margin:0 auto 16px; }
+    .apk-panel-head h2 { margin:0; font-size:19px; font-weight:500; }
+    .apk-panel-head p { margin:4px 0 0; color:#999; font-size:12px; }
+    .apk-close { width:46px; height:46px; border:1px solid #383838; border-radius:50%; background:#191919; font-size:22px; }
+    .apk-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; max-width:720px; margin:auto; }
+    .apk-action { min-height:62px; border:1px solid #343434; border-radius:12px; background:#191919; text-align:left; padding:0 15px; }
+    .apk-action span { margin-right:10px; color:#ddd; }
+    .apk-note { max-width:720px; margin:15px auto 0; color:#888; font-size:11px; line-height:1.6; }
+    .apk-book-list,.apk-chapter-list { display:grid; gap:9px; max-width:720px; margin:auto; }
+    .apk-book { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding:11px; border:1px solid #303030; border-radius:12px; background:#191919; }
+    .apk-book-current { border-color:#858585; }
+    .apk-book-open { min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:5px; padding:4px; border:0; background:none; text-align:left; }
+    .apk-book-name { max-width:100%; overflow:hidden; font-size:15px; text-overflow:ellipsis; white-space:nowrap; }
+    .apk-book-meta { color:#999; font-size:11px; }
+    .apk-book-actions { display:flex; gap:6px; }
+    .apk-small { min-height:42px; padding:0 10px; border:1px solid #3a3a3a; border-radius:9px; background:#222; font-size:12px; }
+    .apk-remove { color:#ffbaba; }
+    .apk-chapter { display:flex; align-items:center; gap:12px; min-height:50px; padding:9px 12px; border:1px solid #333; border-radius:10px; background:#191919; text-align:left; }
+    .apk-chapter.active { border-color:#aaa; }
+    .apk-chapter span:first-child { color:#aaa; font-size:11px; }
+    .apk-chapter span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .apk-setting { padding:12px 0; border-top:1px solid #303030; }
+    .apk-setting label,.apk-setting-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:9px; font-size:13px; }
+    .apk-colors { display:flex; gap:13px; margin:12px 0; }
+    .apk-colors button { width:42px; height:42px; border:1px solid #777; border-radius:50%; }
+    .apk-color-line { display:flex; justify-content:space-between; align-items:center; margin:8px 0; color:#aaa; font-size:12px; }
+    .apk-color-line input[type=color] { width:48px; height:39px; padding:2px; border:1px solid #444; border-radius:8px; background:#181818; }
+    .apk-select { width:100%; min-height:48px; padding:0 11px; border:1px solid #444; border-radius:8px; background:#191919; color:#fff; }
+    .apk-setting input[type=range] { width:100%; height:32px; accent-color:#eee; }
+    .apk-value { color:#aaa; font-variant-numeric:tabular-nums; }
+    .apk-primary,.apk-reset { min-height:48px; border:1px solid #eee; border-radius:999px; background:#f4f4f1; color:#090909; padding:0 17px; font-weight:600; }
+    .apk-reset { width:100%; margin-top:8px; border-color:#444; background:transparent; color:#eee; }
+    .apk-dialog { width:min(92vw,420px); padding:22px; border:1px solid #444; border-radius:16px; background:#111; color:#f4f4f1; }
+    .apk-dialog::backdrop { background:#000b; }
+    .apk-dialog input { width:100%; min-height:48px; padding:0 12px; border:1px solid #444; border-radius:9px; background:#1b1b1b; color:white; }
+    .apk-dialog-actions { display:flex; gap:10px; margin-top:14px; }
+    .apk-dialog-actions button { flex:1; min-height:46px; border-radius:999px; }
+    @media (min-width:760px) { .apk-panel { padding-right:max(28px,calc((100vw - 780px)/2)); padding-left:max(28px,calc((100vw - 780px)/2)); } .apk-actions { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  </style>
+<style id="w012-integration">
+    /* 左側固定功能欄（取代原本「向下滑才出現」的底部面板） */
+    :root { --w012-rail-w: 54px; }
+    #w012Rail {
+      position: fixed; z-index: 30; top: 0; left: 0;
+      width: var(--w012-rail-w); height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: calc(10px + env(safe-area-inset-top,0px)) 0 calc(10px + env(safe-area-inset-bottom,0px));
+      background: #0a0a0af2; border-right: 1px solid #242424;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    #w012Rail .w012-btn {
+      width: 38px; height: 38px; display: grid; place-items: center;
+      border: 1px solid #2a2a2a; border-radius: 10px; background: #151515;
+      color: #e9e9e4; font-size: 15px; line-height: 1; cursor: pointer;
+      text-decoration: none;
+    }
+    #w012Rail .w012-btn:hover { border-color: #6f6f6f; color: #fff; }
+    #w012Rail .w012-spacer { flex: 1; }
+    #w012Rail .w012-rail-label { font-size: 9px; color: #7d7d7d; letter-spacing: .05em; }
+    /* 內容避開功能欄：頁面與「量測頁」都扣掉功能欄寬度，pagination 才會一致 */
+    /* 抽屜打開時（桌機）再多讓出抽屜寬度，正文往右推，不會被蓋住 */
+    #immersiveReader {
+      left: calc(var(--w012-rail-w) + var(--w012-dock, 0px));
+      width: calc(100vw - var(--w012-rail-w) - var(--w012-dock, 0px));
+      transition: left .2s ease, width .2s ease;
+    }
+    .immersive-page {
+      flex: 0 0 calc(100vw - var(--w012-rail-w) - var(--w012-dock, 0px));
+      width: calc(100vw - var(--w012-rail-w) - var(--w012-dock, 0px));
+    }
+    #pageMeasure { width: calc(100vw - var(--w012-rail-w) - var(--w012-dock, 0px)); }
+    @media (min-width: 900px) {
+      body.w012-dock-open { --w012-dock: 340px; }
+    }
+    .immersive-content { padding-left: clamp(18px, 4vw, 46px) !important; padding-right: clamp(18px, 4vw, 46px) !important; }
+
+    /* 頁面左右箭頭 */
+    #w012Arrows { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+    #w012Arrows button {
+      position: fixed; top: 50%; transform: translateY(-50%);
+      width: 46px; height: 46px; display: grid; place-items: center;
+      border: 1px solid #2e2e2e; border-radius: 50%;
+      background: #0b0b0bcc; color: #e6e6e1; font-size: 20px; line-height: 1;
+      pointer-events: auto; cursor: pointer; backdrop-filter: blur(6px);
+      transition: opacity .2s, border-color .2s;
+    }
+    #w012Arrows button:hover { border-color: #777; }
+    #w012Arrows button:disabled { opacity: .25; cursor: default; }
+    #w012Prev { left: calc(var(--w012-rail-w) + 12px); }
+    #w012Next { right: 12px; }
+
+    /* 頁尾：書名／章名／上一章／下一章／頁數（固定高度，量測頁才不會位移） */
+    .immersive-footer {
+      display: grid !important;
+      grid-template-columns: minmax(0,1fr) minmax(0,1.2fr) auto auto auto;
+      align-items: center; gap: 10px;
+      height: 40px; min-height: 40px; padding-top: 6px !important;
+      font-size: 11px; opacity: .8 !important; overflow: hidden;
+    }
+    .immersive-footer .w012-book { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #b9b9b3; }
+    .immersive-footer .w012-chapter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #efefe9; }
+    .immersive-footer .w012-page { font-variant-numeric: tabular-nums; color: #b9b9b3; }
+    .w012-nav-chapter {
+      border: 1px solid #333; background: #141414; color: #dedeD8;
+      border-radius: 999px; padding: 3px 10px; font-size: 11px; cursor: pointer; white-space: nowrap;
+    }
+    .w012-nav-chapter:hover:not(:disabled) { border-color: #777; color: #fff; }
+    .w012-nav-chapter:disabled { opacity: .3; cursor: default; }
+    @media (max-width: 640px) {
+      .immersive-footer { grid-template-columns: minmax(0,1fr) auto auto auto; }
+      .immersive-footer .w012-book { display: none; }
+      #w012Arrows button { width: 38px; height: 38px; font-size: 17px; }
+      #w012Prev { left: calc(var(--w012-rail-w) + 6px); }
+      #w012Next { right: 6px; }
+    }
+    /* 面板：底部上滑 → 左側滑出（貼在功能欄右側，不壓到功能欄的按鈕與自己的標題） */
+    .apk-panel {
+      top: 0; bottom: 0; right: auto; left: var(--w012-rail-w);
+      width: min(340px, calc(100vw - var(--w012-rail-w))); height: 100dvh; max-height: none;
+      border: 0; border-right: 1px solid #303030; border-radius: 0;
+      padding: calc(14px + env(safe-area-inset-top,0px)) 18px calc(20px + env(safe-area-inset-bottom,0px));
+      transform: translateX(calc(-100% - var(--w012-rail-w))); box-shadow: 18px 0 52px #000a;
+    }
+    body.apk-controls-open #apkControls,
+    body.apk-shelf-open #apkShelf,
+    body.apk-chapters-open #apkChapters,
+    body.apk-settings-open #apkSettings { transform: translateX(0); }
+    .apk-handle { display: none; }
+    .apk-scrim { background: rgba(0,0,0,.55); }
+    @media (max-width: 520px) { :root { --w012-rail-w: 48px; } #w012Rail .w012-btn { width: 34px; height: 34px; font-size: 14px; } }
+  </style>
+<meta name="w012-seo" content="1">
+  <meta name="description" content="夜頁小說閱讀器：線上閱讀熾白安東三部曲（七尋、消失的士兵、向風的地方）。">
+  <link rel="canonical" href="https://clairesun6767.github.io/chibaiandong-web/reader/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="夜頁小說閱讀器｜熾白安東三部曲">
+  <meta property="og:description" content="線上閱讀熾白安東三部曲，左側功能欄可切換章節與字體設定。">
+</head>
+</head>
+</head>
+<body>
+  <main id="immersiveReader" aria-label="全螢幕小說閱讀頁"><div id="pageStrip"></div></main>
+  <div class="read-hint">左側功能欄：章節・書架・設定　・　點一下翻頁　・　左右滑換頁</div>
+  <div id="pageMeasure" aria-hidden="true"></div>
+  <button class="apk-scrim" id="apkScrim" aria-label="關閉選單"></button>
+  <section class="apk-panel" id="apkControls" aria-label="閱讀功能">
+    <div class="apk-handle"></div><header class="apk-panel-head"><div><h2>夜頁</h2><p id="apkCurrentBook">離線小說閱讀器</p></div><button class="apk-close" data-apk-close aria-label="關閉">×</button></header>
+    <div class="apk-actions">
+      <button class="apk-action" id="apkOpenShelf"><span>▤</span>書架</button><button class="apk-action" id="apkOpenChapters"><span>☷</span>章節</button>
+      <button class="apk-action" id="apkOpenSettings"><span>Aa</span>閱讀設定</button><button class="apk-action" id="apkOpenFile"><span>＋</span>載入 TXT</button>
+    </div>
+    <p class="apk-note">小說與閱讀進度會保存在這台手機，離線也能閱讀。</p>
+  </section>
+  <section class="apk-panel" id="apkShelf" aria-label="書架">
+    <div class="apk-handle"></div><header class="apk-panel-head"><div><h2>書架</h2><p>已載入的小說</p></div><button class="apk-close" data-apk-close aria-label="關閉">×</button></header>
+    <div class="apk-book-list" id="apkBookList"></div><p class="apk-note">移除只會清除此閱讀器的小說與進度，不會刪除原始 TXT 檔。</p>
+  </section>
+  <section class="apk-panel" id="apkChapters" aria-label="章節目錄">
+    <div class="apk-handle"></div><header class="apk-panel-head"><div><h2>章節</h2><p id="apkChapterBook"></p></div><button class="apk-close" data-apk-close aria-label="關閉">×</button></header><div class="apk-chapter-list" id="apkChapterList"></div>
+  </section>
+  <section class="apk-panel" id="apkSettings" aria-label="閱讀設定">
+    <div class="apk-handle"></div><header class="apk-panel-head"><div><h2>閱讀設定</h2><p>調整底色與閱讀文字</p></div><button class="apk-close" data-apk-close aria-label="關閉">×</button></header>
+    <div style="max-width:720px;margin:auto">
+      <div class="apk-setting"><div>背景色</div><div class="apk-colors">
+        <button data-apk-bg="#000000" data-apk-ink="#f4f4f1" style="background:#000" aria-label="純黑底色"></button><button data-apk-bg="#171717" data-apk-ink="#eeeeeb" style="background:#171717" aria-label="石墨底色"></button><button data-apk-bg="#211d18" data-apk-ink="#e9dfd2" style="background:#211d18" aria-label="暖棕底色"></button><button data-apk-bg="#e7e1d5" data-apk-ink="#29251f" style="background:#e7e1d5" aria-label="紙白底色"></button>
+      </div><div class="apk-color-line"><span>自訂背景</span><input id="apkBgColor" type="color" value="#000000" aria-label="自訂背景色"></div><div class="apk-color-line"><span>文字顏色</span><input id="apkTextColor" type="color" value="#f4f4f1" aria-label="文字顏色"></div></div>
+      <div class="apk-setting"><label for="apkFont">字體</label><select class="apk-select" id="apkFont"><option value="serif">明體・適合長篇閱讀</option><option value="sans">黑體・清晰俐落</option><option value="kai">楷體・帶有手寫感</option><option value="georgia">Georgia・西文襯線</option></select></div>
+      <div class="apk-setting"><div class="apk-setting-head"><label for="apkSize">字體大小</label><output class="apk-value" id="apkSizeValue">20 px</output></div><input id="apkSize" type="range" min="14" max="34" value="20" aria-label="字體大小"></div>
+      <div class="apk-setting"><div class="apk-setting-head"><label for="apkLeading">行距</label><output class="apk-value" id="apkLeadingValue">1.90</output></div><input id="apkLeading" type="range" min="1.5" max="2.3" step="0.05" value="1.9" aria-label="行距"></div>
+      <button class="apk-reset" id="apkReset">重設閱讀設定</button>
+    </div>
+  </section>
+  <dialog class="apk-dialog" id="apkRenameDialog"><form id="apkRenameForm" method="dialog"><h2>修改書名</h2><input id="apkRenameInput" maxlength="120" required aria-label="書名"><div class="apk-dialog-actions"><button class="quiet-button" value="cancel">取消</button><button class="apk-primary" id="apkRenameSave" value="save">儲存</button></div></form></dialog>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="書架與章節目錄">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">頁</div>
+        <div><div class="brand-name">夜頁</div><div class="brand-subtitle">TXT 小說閱讀器</div></div>
+      </div>
+      <div class="side-label">目前閱讀</div>
+      <div class="book-entry">
+        <div class="book-cover" aria-hidden="true"><span>雨</span></div>
+        <div><div class="book-title" id="bookTitle">雨停前的書店</div><div class="book-meta" id="bookMeta">內建試讀 · 3 章</div></div>
+      </div>
+      <div class="toc-heading"><h2>章節目錄</h2><span class="toc-count" id="tocCount">3 章</span></div>
+      <label class="search-wrap">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.4" stroke="currentColor" stroke-width="1.5"/><path d="m12.7 12.7 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input id="tocSearch" type="search" placeholder="搜尋章節" aria-label="搜尋章節">
+      </label>
+      <nav class="chapter-list" id="chapterList" aria-label="小說章節"></nav>
+      <div class="sidebar-bottom">
+        <div class="progress-label"><span>本書進度</span><span id="progressText">0%</span></div>
+        <div class="progress-track" aria-hidden="true"><span id="globalProgress"></span></div>
+        <p class="side-footnote">檔案儲存在此裝置，不會上傳。</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-leading">
+          <button class="icon-button mobile-only" id="tocToggle" type="button" aria-label="開啟章節目錄" aria-expanded="false" aria-controls="sidebar">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 5.5h12M4 10h12M4 14.5h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="crumbs"><span class="book-crumb" id="topBookTitle">雨停前的書店</span><span class="crumb-divider">/</span><span class="chapter-crumb" id="topChapterTitle">第一章　午後的雨</span></div>
+        </div>
+        <div class="topbar-actions">
+          <div class="reading-position"><span id="chapterPosition">第 1 / 3 章</span><span class="dot">·</span><span id="chapterProgressText">章內 <span id="chapterProgress">0%</span></span></div>
+          <button class="action-button settings-toggle" id="settingsToggle" type="button" aria-label="閱讀設定" aria-expanded="false" aria-controls="settingsPanel">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6.5" cy="5.5" r="1.4" fill="#000" stroke="currentColor"/><circle cx="12" cy="10" r="1.4" fill="#000" stroke="currentColor"/><circle cx="9" cy="14.5" r="1.4" fill="#000" stroke="currentColor"/></svg>
+            閱讀設定
+          </button>
+          <button class="action-button install-top-button" id="installTopButton" type="button" aria-label="安裝夜頁" title="安裝夜頁">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5M4 13.5v2A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            安裝夜頁
+          </button>
+          <button class="action-button primary-button" id="importButton" type="button" title="開啟 TXT 檔案">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5v3A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="button-text">開啟 TXT</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="workbench">
+        <section class="reader-column" aria-label="小說閱讀內容">
+          <div class="reader-page" id="readerPage">
+            <div class="reader-kicker"><span>正在閱讀</span><span class="source-label" id="sourceLabel">內建試讀</span></div>
+            <header class="chapter-heading">
+              <p class="chapter-number" id="chapterNumber">CHAPTER 01</p>
+              <h1 id="chapterTitle">第一章　午後的雨</h1>
+              <div class="chapter-detail"><span id="paragraphCount">4 個段落</span><span>·</span><span id="readingTime">約 1 分鐘</span></div>
+            </header>
+            <article class="prose" id="prose" aria-label="章節文字"></article>
+            <nav class="chapter-pager" aria-label="切換章節">
+              <button class="pager-button" id="previousChapter" type="button"><span class="pager-direction">上一章</span><span class="pager-title" id="previousTitle">已是第一章</span></button>
+              <button class="pager-button" id="nextChapter" type="button"><span class="pager-direction">下一章</span><span class="pager-title" id="nextTitle">第二章　未寄出的信</span></button>
+            </nav>
+          </div>
+          <p class="file-note">選擇 TXT 檔，或將小說拖曳到此頁。</p>
+        </section>
+
+        <aside class="settings-panel" id="settingsPanel" aria-label="閱讀外觀設定">
+          <div class="settings-heading">
+            <div><h2 class="desktop-settings-title">閱讀設定</h2><h2 class="mobile-settings-title">閱讀外觀</h2><p>依照習慣調整文字與底色</p></div>
+            <button class="icon-button settings-close" id="settingsClose" type="button" aria-label="關閉閱讀設定">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <section class="setting-group" aria-labelledby="backgroundLabel">
+            <span class="setting-label" id="backgroundLabel">背景色</span>
+            <div class="swatches" role="group" aria-label="背景色預設">
+              <button class="swatch" type="button" data-bg="#000000" data-ink="#f4f4f1" aria-label="純黑底色" aria-pressed="true" style="background:#000"></button>
+              <button class="swatch" type="button" data-bg="#171717" data-ink="#eeeeeb" aria-label="石墨底色" aria-pressed="false" style="background:#171717"></button>
+              <button class="swatch" type="button" data-bg="#211d18" data-ink="#e9dfd2" aria-label="暖棕底色" aria-pressed="false" style="background:#211d18"></button>
+              <button class="swatch" type="button" data-bg="#e7e1d5" data-ink="#29251f" aria-label="紙白底色" aria-pressed="false" style="background:#e7e1d5"></button>
+            </div>
+            <div class="color-row"><span>自訂背景</span><label class="color-control"><input id="backgroundColor" type="color" value="#000000" aria-label="自訂背景顏色"><span id="backgroundHex">#000000</span></label></div>
+            <div class="color-row"><span>文字顏色</span><label class="color-control"><input id="textColor" type="color" value="#f4f4f1" aria-label="自訂文字顏色"><span id="textHex">#F4F4F1</span></label></div>
+          </section>
+          <section class="setting-group">
+            <label class="setting-label" for="fontSelect">字體</label>
+            <select class="font-select" id="fontSelect">
+              <option value="serif">明體・適合長篇閱讀</option>
+              <option value="sans">黑體・清晰俐落</option>
+              <option value="kai">楷體・帶有手寫感</option>
+              <option value="georgia">Georgia・西文襯線</option>
+            </select>
+          </section>
+          <section class="setting-group">
+            <div class="range-head">
+              <label class="setting-label" for="fontSize">字體大小</label>
+              <div class="stepper">
+                <button class="step-button" id="smallerText" type="button" aria-label="縮小字體"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                <output class="range-value" id="fontSizeValue" for="fontSize">20 px</output>
+                <button class="step-button" id="largerText" type="button" aria-label="放大字體"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+              </div>
+            </div>
+            <input id="fontSize" type="range" min="14" max="34" step="1" value="20" aria-label="字體大小">
+            <div class="range-labels"><span>較小</span><span>較大</span></div>
+          </section>
+          <section class="setting-group">
+            <div class="range-head"><label class="setting-label" for="lineHeight">行距</label><output class="range-value" id="lineHeightValue" for="lineHeight">1.90</output></div>
+            <input id="lineHeight" type="range" min="1.5" max="2.3" step="0.05" value="1.9" aria-label="行距">
+            <div class="range-labels"><span>緊密</span><span>寬鬆</span></div>
+          </section>
+          <section class="setting-group">
+            <div class="range-head"><label class="setting-label" for="readingWidth">閱讀欄寬</label><output class="range-value" id="readingWidthValue" for="readingWidth">700 px</output></div>
+            <input id="readingWidth" type="range" min="560" max="780" step="20" value="700" aria-label="閱讀欄寬">
+            <div class="range-labels"><span>窄</span><span>寬</span></div>
+          </section>
+          <button class="reset-button" id="resetSettings" type="button">重設閱讀設定</button>
+          <button class="install-button" id="installButton" type="button">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5M4 13.5v2A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="installButtonLabel">安裝／加入主畫面</span>
+          </button>
+          <p class="settings-footnote">你的小說會保存在此裝置，不會上傳。字體依裝置已安裝的字型顯示。</p>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <nav class="mobile-reader-bar" aria-label="手機章節導覽">
+    <button class="mobile-page-button" id="mobilePrevious" type="button" aria-label="上一章">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12.5 4.5-5 5.5 5 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="mobile-position">
+      <div class="mobile-position-line"><span id="mobileChapterCount">第 1 / 3 章</span><span id="mobileChapterName">第一章　午後的雨</span></div>
+      <div class="mobile-progress" aria-hidden="true"><span id="mobileProgressBar"></span></div>
+    </div>
+    <button class="mobile-page-button" id="mobileNext" type="button" aria-label="下一章">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7.5 4.5 5 5.5-5 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </nav>
+
+  <button class="scrim" id="scrim" type="button" aria-label="關閉側邊面板"></button>
+  <div class="drop-overlay" aria-hidden="true"><div><strong>放開以開啟小說</strong><span>支援純文字 TXT 檔案</span></div></div>
+  <input class="sr-only" id="fileInput" type="file" accept=".txt,.text,text/plain">
+  <div class="live-region" id="liveRegion" role="status" aria-live="polite"></div>
+
+  <dialog class="install-dialog" id="installDialog" aria-labelledby="installHeading">
+    <h2 id="installHeading">把夜頁加入手機</h2>
+    <p><strong>iPhone：</strong>在 Safari 開啟此網址，點「分享」→「加入主畫面」。若出現「以網頁 App 開啟」，請一併開啟。</p>
+    <p><strong>Android：</strong>如果按鈕沒有直接叫出安裝視窗，請在 Chrome 點右上角「⋮」，再選「安裝應用程式」或「加到主畫面」。</p>
+    <p>安裝需要 HTTPS 網址。第一次開啟後，夜頁會快取閱讀器，之後可離線閱讀。</p>
+    <form method="dialog"><button class="dialog-close" type="submit">知道了</button></form>
+  </dialog>
+
+  <script>
+    const defaults = { background: "#000000", text: "#f4f4f1", font: "serif", size: 20, leading: 1.9, width: 700 };
+    const fonts = {
+      serif: '"Noto Serif TC", "Songti TC", "PMingLiU", serif',
+      sans: '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif',
+      kai: '"Kaiti TC", "DFKai-SB", "KaiTi", serif',
+      georgia: 'Georgia, "Times New Roman", serif'
+    };
+    const demo = {
+      name: "雨停前的書店",
+      source: "內建試讀",
+      chapters: [
+        { title: "第一章　午後的雨", text: "那家書店總在下雨時才亮起燈。\n\n林澄第一次推開門，雨水正沿著傘骨往下滴。門上的銅鈴響了一聲，書架深處有人抬起頭，像是早知道她會來。\n\n「你要找的那本書，還在這裡。」店主說。\n\n她沒有問他怎麼知道。窗外的雨把街道洗得發亮，而空氣裡有紙張、木頭，以及一點快要想起來的氣味。" },
+        { title: "第二章　未寄出的信", text: "店主從抽屜裡取出一封沒有地址的信。信紙已經泛黃，摺痕卻很新，像有人每隔一段時間便把它打開，再小心地放回原處。\n\n「這不是寫給我的。」林澄說。\n\n「我知道。」他把信推到她面前，「所以才一直替你留著。」\n\n雨聲落在屋簷上，一陣緊過一陣。她認得那個字跡，卻不記得自己曾經寫下這些話。" },
+        { title: "第三章　天亮以前", text: "信的最後只有一行字：如果有一天你回來，請記得把燈留著。\n\n林澄抬頭時，店裡的鐘停在四點十七分。她忽然想起好多年前，也有一個雨夜，她站在這扇門外，答應了某個人要回來。\n\n窗外的雨漸漸小了。天光從雲後浮出，書店的燈依舊亮著，銅鈴安靜地守在門邊。\n\n她把信收進外套口袋，推開門走進清晨。" }
+      ]
+    };
+
+    let book = { name: demo.name, source: demo.source, chapters: demo.chapters.map(function (chapter) { return { title: chapter.title, text: chapter.text }; }) };
+    let chapterIndex = 0;
+    let settings = loadSettings();
+    let dbPromise;
+    let deferredInstallPrompt = null;
+    let saveProgressTimer = null;
+
+    const el = {
+      bookTitle: document.getElementById("bookTitle"),
+      bookMeta: document.getElementById("bookMeta"),
+      topBookTitle: document.getElementById("topBookTitle"),
+      topChapterTitle: document.getElementById("topChapterTitle"),
+      chapterTitle: document.getElementById("chapterTitle"),
+      chapterNumber: document.getElementById("chapterNumber"),
+      chapterPosition: document.getElementById("chapterPosition"),
+      chapterProgress: document.getElementById("chapterProgress"),
+      paragraphCount: document.getElementById("paragraphCount"),
+      readingTime: document.getElementById("readingTime"),
+      sourceLabel: document.getElementById("sourceLabel"),
+      chapterList: document.getElementById("chapterList"),
+      tocCount: document.getElementById("tocCount"),
+      prose: document.getElementById("prose"),
+      readerPage: document.getElementById("readerPage"),
+      previous: document.getElementById("previousChapter"),
+      next: document.getElementById("nextChapter"),
+      previousTitle: document.getElementById("previousTitle"),
+      nextTitle: document.getElementById("nextTitle"),
+      progressText: document.getElementById("progressText"),
+      globalProgress: document.getElementById("globalProgress"),
+      mobileChapterCount: document.getElementById("mobileChapterCount"),
+      mobileChapterName: document.getElementById("mobileChapterName"),
+      mobileProgressBar: document.getElementById("mobileProgressBar"),
+      mobilePrevious: document.getElementById("mobilePrevious"),
+      mobileNext: document.getElementById("mobileNext"),
+      fontSelect: document.getElementById("fontSelect"),
+      fontSize: document.getElementById("fontSize"),
+      fontSizeValue: document.getElementById("fontSizeValue"),
+      lineHeight: document.getElementById("lineHeight"),
+      lineHeightValue: document.getElementById("lineHeightValue"),
+      readingWidth: document.getElementById("readingWidth"),
+      readingWidthValue: document.getElementById("readingWidthValue"),
+      backgroundColor: document.getElementById("backgroundColor"),
+      backgroundHex: document.getElementById("backgroundHex"),
+      textColor: document.getElementById("textColor"),
+      textHex: document.getElementById("textHex"),
+      fileInput: document.getElementById("fileInput"),
+      liveRegion: document.getElementById("liveRegion")
+    };
+
+    function loadSettings() {
+      try {
+        const stored = JSON.parse(localStorage.getItem("yeye-reader-settings") || "{}");
+        return Object.assign({}, defaults, stored);
+      } catch (error) {
+        return Object.assign({}, defaults);
+      }
+    }
+
+    function saveSettings() {
+      try { localStorage.setItem("yeye-reader-settings", JSON.stringify(settings)); } catch (error) {}
+    }
+
+    function announce(message) { el.liveRegion.textContent = message; }
+
+    function applySettings() {
+      document.documentElement.style.setProperty("--reader-bg", settings.background);
+      document.documentElement.style.setProperty("--reader-ink", settings.text);
+      document.documentElement.style.setProperty("--reader-font", fonts[settings.font] || fonts.serif);
+      document.documentElement.style.setProperty("--reader-size", settings.size + "px");
+      document.documentElement.style.setProperty("--reader-leading", String(settings.leading));
+      document.documentElement.style.setProperty("--reader-width", settings.width + "px");
+      el.fontSelect.value = settings.font;
+      el.fontSize.value = String(settings.size);
+      el.fontSizeValue.textContent = settings.size + " px";
+      el.lineHeight.value = String(settings.leading);
+      el.lineHeightValue.textContent = Number(settings.leading).toFixed(2);
+      el.readingWidth.value = String(settings.width);
+      el.readingWidthValue.textContent = settings.width + " px";
+      el.backgroundColor.value = settings.background;
+      el.backgroundHex.textContent = settings.background.toUpperCase();
+      el.textColor.value = settings.text;
+      el.textHex.textContent = settings.text.toUpperCase();
+      document.querySelectorAll(".swatch").forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.dataset.bg.toLowerCase() === settings.background.toLowerCase()));
+      });
+      saveSettings();
+    }
+
+    function getDb() {
+      if (!("indexedDB" in window)) return Promise.reject(new Error("IndexedDB unavailable"));
+      if (!dbPromise) {
+        dbPromise = new Promise(function (resolve, reject) {
+          const request = indexedDB.open("yeye-reader", 2);
+          request.onupgradeneeded = function () {
+            const database = request.result;
+            if (!database.objectStoreNames.contains("books")) database.createObjectStore("books");
+            if (!database.objectStoreNames.contains("position")) database.createObjectStore("position");
+            if (!database.objectStoreNames.contains("library")) database.createObjectStore("library");
+          };
+          request.onsuccess = function () { resolve(request.result); };
+          request.onerror = function () { reject(request.error); };
+        });
+      }
+      return dbPromise;
+    }
+
+    function readRecord(storeName, key) {
+      return getDb().then(function (database) {
+        return new Promise(function (resolve, reject) {
+          const transaction = database.transaction(storeName, "readonly");
+          const request = transaction.objectStore(storeName).get(key);
+          request.onsuccess = function () { resolve(request.result); };
+          request.onerror = function () { reject(request.error); };
+        });
+      });
+    }
+
+    function writeRecord(storeName, key, value) {
+      return getDb().then(function (database) {
+        return new Promise(function (resolve, reject) {
+          const transaction = database.transaction(storeName, "readwrite");
+          transaction.objectStore(storeName).put(value, key);
+          transaction.oncomplete = function () { resolve(); };
+          transaction.onerror = function () { reject(transaction.error); };
+        });
+      });
+    }
+
+    async function persistBook() {
+      if (book.source !== "TXT 檔案") return;
+      try {
+        await writeRecord("books", "current", { name: book.name, source: book.source, chapters: book.chapters });
+      } catch (error) {
+        announce("小說已載入，但此瀏覽器無法儲存續讀資料");
+      }
+    }
+
+    function queuePositionSave() {
+      if (book.source !== "TXT 檔案") return;
+      window.clearTimeout(saveProgressTimer);
+      saveProgressTimer = window.setTimeout(function () {
+        const maxScroll = Math.max(0, el.readerPage.offsetHeight - window.innerHeight);
+        const ratio = maxScroll === 0 ? 0 : Math.max(0, Math.min(1, window.scrollY / maxScroll));
+        writeRecord("position", "current", { chapter: chapterIndex, progress: ratio }).catch(function () {});
+      }, 400);
+    }
+
+    function readingMinutes(text) {
+      const characters = Array.from(text.replace(/\s/g, "")).length;
+      return "約 " + Math.max(1, Math.ceil(characters / 450)) + " 分鐘";
+    }
+
+    function renderChapterList(search) {
+      const query = (search || "").trim().toLocaleLowerCase();
+      el.chapterList.replaceChildren();
+      let count = 0;
+      book.chapters.forEach(function (chapter, index) {
+        if (query && !chapter.title.toLocaleLowerCase().includes(query)) return;
+        count += 1;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "chapter-button";
+        button.setAttribute("aria-current", index === chapterIndex ? "page" : "false");
+        button.addEventListener("click", function () {
+          openChapter(index, true);
+          closePanels();
+        });
+        const number = document.createElement("span");
+        number.className = "chapter-index";
+        number.textContent = String(index + 1).padStart(2, "0");
+        const title = document.createElement("span");
+        title.className = "chapter-name";
+        title.textContent = chapter.title;
+        button.append(number, title);
+        el.chapterList.append(button);
+      });
+      if (!count) {
+        const empty = document.createElement("div");
+        empty.className = "empty-search";
+        empty.textContent = "沒有符合的章節";
+        el.chapterList.append(empty);
+      }
+      el.tocCount.textContent = book.chapters.length + " 章";
+    }
+
+    function renderText(text) {
+      el.prose.replaceChildren();
+      const paragraphs = text.split(/\n\s*\n+/).map(function (part) { return part.trim(); }).filter(Boolean);
+      if (!paragraphs.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-chapter";
+        empty.textContent = "本章沒有文字內容。";
+        el.prose.append(empty);
+        return 0;
+      }
+      paragraphs.forEach(function (part) {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = part;
+        el.prose.append(paragraph);
+      });
+      return paragraphs.length;
+    }
+
+    function openChapter(index, scrollToTop, shouldAnnounce) {
+      if (index < 0 || index >= book.chapters.length) return;
+      chapterIndex = index;
+      const chapter = book.chapters[index];
+      const count = renderText(chapter.text);
+      const number = String(index + 1).padStart(2, "0");
+      el.chapterTitle.textContent = chapter.title;
+      el.topChapterTitle.textContent = chapter.title;
+      el.chapterNumber.textContent = "CHAPTER " + number;
+      el.chapterPosition.textContent = "第 " + (index + 1) + " / " + book.chapters.length + " 章";
+      el.mobileChapterCount.textContent = "第 " + (index + 1) + " / " + book.chapters.length + " 章";
+      el.mobileChapterName.textContent = chapter.title;
+      el.paragraphCount.textContent = count + " 個段落";
+      el.readingTime.textContent = readingMinutes(chapter.text);
+      el.sourceLabel.textContent = book.source;
+      el.previous.disabled = index === 0;
+      el.mobilePrevious.disabled = index === 0;
+      el.next.disabled = index === book.chapters.length - 1;
+      el.mobileNext.disabled = index === book.chapters.length - 1;
+      el.previousTitle.textContent = index > 0 ? book.chapters[index - 1].title : "已是第一章";
+      el.nextTitle.textContent = index < book.chapters.length - 1 ? book.chapters[index + 1].title : "已是最後一章";
+      el.bookTitle.textContent = book.name;
+      el.topBookTitle.textContent = book.name;
+      el.bookMeta.textContent = book.source + " · " + book.chapters.length + " 章";
+      renderChapterList(document.getElementById("tocSearch").value);
+      if (scrollToTop !== false) window.scrollTo(0, 0);
+      updateProgress();
+      if (shouldAnnounce !== false) announce("已開啟" + chapter.title);
+      queuePositionSave();
+    }
+
+    function parseTxt(text) {
+      const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+      const lines = normalized.split("\n");
+      const numerals = "零〇一二三四五六七八九十百千萬万兩两0-9";
+      const chinese = new RegExp("^第\\s*[" + numerals + "]+\\s*[章节節回話话卷部篇集](?:\\s*[:：、.．—-].*|\\s+.{1,48})?\\s*$");
+      const english = /^(?:chapter|chap\.?|ch\.?|episode|part)\s+(?:\d+|[ivxlcdm]+)(?:\s*[:：、.．—-].*|\s+.{1,48})?\s*$/i;
+      const named = /^(?:序章|楔子|引子|序幕|前言|尾聲|尾声|終章|终章|後記|后记|番外(?:篇|章)?)(?:\s*[:：、.．—-].*|\s+.{1,48})?\s*$/i;
+      const markdown = /^#{1,3}\s+/;
+      const marks = [];
+
+      lines.forEach(function (line, index) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.length > 64) return;
+        const title = trimmed.replace(markdown, "").trim();
+        if (chinese.test(title) || english.test(title) || named.test(title)) marks.push({ index: index, title: title });
+      });
+
+      if (!marks.length) return [{ title: "全文", text: normalized.trim() }];
+      const chapters = [];
+      if (marks[0].index > 0) {
+        const preface = lines.slice(0, marks[0].index).join("\n").trim();
+        if (preface) chapters.push({ title: "序文", text: preface });
+      }
+      marks.forEach(function (mark, index) {
+        const end = index + 1 < marks.length ? marks[index + 1].index : lines.length;
+        chapters.push({ title: mark.title, text: lines.slice(mark.index + 1, end).join("\n").trim() });
+      });
+      return chapters;
+    }
+
+    function replacementCount(text) { return (text.match(/\uFFFD/g) || []).length; }
+
+    async function decodeFile(file) {
+      const buffer = await file.arrayBuffer();
+      const utf8 = new TextDecoder("utf-8").decode(buffer);
+      if (replacementCount(utf8) < 2) return utf8;
+      let best = utf8;
+      ["big5", "gb18030"].forEach(function (encoding) {
+        try {
+          const candidate = new TextDecoder(encoding).decode(buffer);
+          if (replacementCount(candidate) < replacementCount(best)) best = candidate;
+        } catch (error) {}
+      });
+      return best;
+    }
+
+    async function loadFile(file) {
+      if (!file || (!/\.(txt|text)$/i.test(file.name) && file.type !== "text/plain")) {
+        announce("請選擇 TXT 純文字檔");
+        return;
+      }
+      try {
+        const text = await decodeFile(file);
+        if (!text.trim()) { announce("這個檔案沒有文字內容"); return; }
+        book = {
+          name: file.name.replace(/\.(txt|text)$/i, "") || "未命名小說",
+          source: "TXT 檔案",
+          chapters: parseTxt(text)
+        };
+        chapterIndex = 0;
+        document.getElementById("tocSearch").value = "";
+        await persistBook();
+        openChapter(0, true, false);
+        announce("已載入 " + file.name + "，偵測到 " + book.chapters.length + " 章");
+      } catch (error) {
+        announce("無法讀取這個檔案，請確認它是純文字 TXT");
+      } finally {
+        el.fileInput.value = "";
+      }
+    }
+
+    function updateProgress() {
+      const pageTop = window.scrollY + el.readerPage.getBoundingClientRect().top;
+      const range = Math.max(0, el.readerPage.offsetHeight - window.innerHeight);
+      const local = range === 0 ? 0 : Math.max(0, Math.min(1, (window.scrollY - pageTop) / range));
+      const percent = Math.round(local * 100);
+      const whole = Math.round(Math.max(0, Math.min(1, (chapterIndex + local) / Math.max(1, book.chapters.length))) * 100);
+      el.chapterProgress.textContent = percent + "%";
+      el.progressText.textContent = whole + "%";
+      el.globalProgress.style.width = whole + "%";
+      el.mobileProgressBar.style.width = percent + "%";
+      queuePositionSave();
+    }
+
+    function closePanels() {
+      document.body.classList.remove("toc-open", "settings-open");
+      document.getElementById("tocToggle").setAttribute("aria-expanded", "false");
+      document.getElementById("settingsToggle").setAttribute("aria-expanded", "false");
+    }
+
+    function openSettings() {
+      document.body.classList.remove("toc-open");
+      document.body.classList.add("settings-open");
+      document.getElementById("tocToggle").setAttribute("aria-expanded", "false");
+      document.getElementById("settingsToggle").setAttribute("aria-expanded", "true");
+      document.getElementById("settingsClose").focus();
+    }
+
+    function changeSize(value) {
+      settings.size = Math.max(14, Math.min(34, Number(value)));
+      el.fontSize.value = String(settings.size);
+      applySettings();
+    }
+
+    function applyBackground(background, text) {
+      settings.background = background.toLowerCase();
+      if (text) settings.text = text.toLowerCase();
+      applySettings();
+    }
+
+    function contrastFor(hex) {
+      const value = hex.replace("#", "");
+      const r = parseInt(value.slice(0, 2), 16);
+      const g = parseInt(value.slice(2, 4), 16);
+      const b = parseInt(value.slice(4, 6), 16);
+      const brightness = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return brightness > .58 ? "#29251f" : "#f4f4f1";
+    }
+
+    document.getElementById("importButton").addEventListener("click", function () { el.fileInput.click(); });
+    el.fileInput.addEventListener("change", function (event) { loadFile(event.target.files && event.target.files[0]); });
+    el.previous.addEventListener("click", function () { openChapter(chapterIndex - 1, true); });
+    el.mobilePrevious.addEventListener("click", function () { openChapter(chapterIndex - 1, true); });
+    el.next.addEventListener("click", function () { openChapter(chapterIndex + 1, true); });
+    el.mobileNext.addEventListener("click", function () { openChapter(chapterIndex + 1, true); });
+    document.getElementById("tocSearch").addEventListener("input", function (event) { renderChapterList(event.target.value); });
+
+    document.getElementById("tocToggle").addEventListener("click", function () {
+      const open = document.body.classList.toggle("toc-open");
+      document.body.classList.remove("settings-open");
+      this.setAttribute("aria-expanded", String(open));
+      document.getElementById("settingsToggle").setAttribute("aria-expanded", "false");
+    });
+    document.getElementById("settingsToggle").addEventListener("click", function () {
+      if (document.body.classList.contains("settings-open")) closePanels();
+      else openSettings();
+    });
+    document.getElementById("settingsClose").addEventListener("click", closePanels);
+    document.getElementById("scrim").addEventListener("click", closePanels);
+
+    document.querySelectorAll(".swatch").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyBackground(button.dataset.bg, button.dataset.ink);
+        el.backgroundColor.value = settings.background;
+        el.textColor.value = settings.text;
+      });
+    });
+    el.backgroundColor.addEventListener("input", function (event) { applyBackground(event.target.value, contrastFor(event.target.value)); });
+    el.textColor.addEventListener("input", function (event) { settings.text = event.target.value.toLowerCase(); applySettings(); });
+    el.fontSelect.addEventListener("change", function (event) { settings.font = event.target.value; applySettings(); });
+    el.fontSize.addEventListener("input", function (event) { changeSize(event.target.value); });
+    document.getElementById("smallerText").addEventListener("click", function () { changeSize(settings.size - 1); });
+    document.getElementById("largerText").addEventListener("click", function () { changeSize(settings.size + 1); });
+    el.lineHeight.addEventListener("input", function (event) { settings.leading = Number(event.target.value); applySettings(); });
+    el.readingWidth.addEventListener("input", function (event) { settings.width = Number(event.target.value); applySettings(); });
+    document.getElementById("resetSettings").addEventListener("click", function () { settings = Object.assign({}, defaults); applySettings(); announce("閱讀設定已重設"); });
+
+    const installDialog = document.getElementById("installDialog");
+    const installButtonLabel = document.getElementById("installButtonLabel");
+    window.addEventListener("beforeinstallprompt", function (event) {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      installButtonLabel.textContent = "安裝夜頁";
+    });
+    async function handleInstallClick() {
+      if (!deferredInstallPrompt) { installDialog.showModal(); return; }
+      const prompt = deferredInstallPrompt;
+      deferredInstallPrompt = null;
+      prompt.prompt();
+      await prompt.userChoice;
+    }
+    document.getElementById("installButton").addEventListener("click", handleInstallClick);
+    document.getElementById("installTopButton").addEventListener("click", handleInstallClick);
+    window.addEventListener("appinstalled", function () {
+      deferredInstallPrompt = null;
+      announce("夜頁已加入手機");
+    });
+
+    let dragDepth = 0;
+    document.addEventListener("dragenter", function (event) {
+      if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes("Files")) return;
+      event.preventDefault();
+      dragDepth += 1;
+      document.body.classList.add("drag-active");
+    });
+    document.addEventListener("dragover", function (event) {
+      if (event.dataTransfer && Array.from(event.dataTransfer.types || []).includes("Files")) event.preventDefault();
+    });
+    document.addEventListener("dragleave", function (event) {
+      if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes("Files")) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) document.body.classList.remove("drag-active");
+    });
+    document.addEventListener("drop", function (event) {
+      if (!event.dataTransfer) return;
+      event.preventDefault();
+      dragDepth = 0;
+      document.body.classList.remove("drag-active");
+      if (event.dataTransfer.files && event.dataTransfer.files[0]) loadFile(event.dataTransfer.files[0]);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") closePanels();
+      if ((event.altKey || event.ctrlKey) && event.key === "ArrowRight") { event.preventDefault(); openChapter(chapterIndex + 1, true); }
+      if ((event.altKey || event.ctrlKey) && event.key === "ArrowLeft") { event.preventDefault(); openChapter(chapterIndex - 1, true); }
+    });
+    window.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+
+    async function startApp() {
+      applySettings();
+      renderChapterList("");
+      openChapter(0, false, false);
+      try {
+        const savedBook = await readRecord("books", "current");
+        const savedPosition = await readRecord("position", "current");
+        if (savedBook && Array.isArray(savedBook.chapters) && savedBook.chapters.length) {
+          book = savedBook;
+          chapterIndex = Math.max(0, Math.min(book.chapters.length - 1, Number(savedPosition && savedPosition.chapter) || 0));
+          renderChapterList("");
+          openChapter(chapterIndex, false, false);
+          const progress = Math.max(0, Math.min(1, Number(savedPosition && savedPosition.progress) || 0));
+          requestAnimationFrame(function () {
+            const max = Math.max(0, el.readerPage.offsetHeight - window.innerHeight);
+            window.scrollTo(0, max * progress);
+            updateProgress();
+          });
+        }
+      } catch (error) {
+        // The sample remains available if local storage is unavailable.
+      }
+    }
+    // The immersive Android reader initializes from the multi-book library below.
+</script>
+<script>
+(function() {
+  let libraryBooks = [];
+  let activeBook = null;
+  let activePage = 0;
+  let renderedPages = [];
+  let saveTimer = 0;
+  let reflowTimer = 0;
+  let renderSequence = 0;
+  let renameId = null;
+  let pointerStart = null;
+  const q = function(id) { return document.getElementById(id); };
+  const setMessage = function(message) { el.liveRegion.textContent = message; };
+  const fontMap = {
+    serif:'"Noto Serif TC","Songti TC","PMingLiU",serif',
+    sans:'"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif',
+    kai:'"Kaiti TC","DFKai-SB","KaiTi",serif',
+    georgia:'Georgia,"Times New Roman",serif'
+  };
+  function showPanel(name) {
+    hidePanels();
+    document.body.classList.add("apk-panel-open", "apk-" + name + "-open");
+    if (name === "shelf") drawShelf();
+    if (name === "chapters") drawChapterList();
+  }
+  function showControls() {
+    hidePanels();
+    document.body.classList.add("apk-panel-open", "apk-controls-open");
+  }
+  function hidePanels() {
+    document.body.classList.remove("apk-panel-open", "apk-controls-open", "apk-shelf-open", "apk-chapters-open", "apk-settings-open");
+  }
+  function make(tag, className, value) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (value != null) node.textContent = value;
+    return node;
+  }
+  function chapterTextParts(text) {
+    return String(text || "").split(/\n\s*\n+/).map(function(part) { return part.trim(); }).filter(Boolean);
+  }
+  function chapterMinutes(text) {
+    return "約 " + Math.max(1, Math.ceil(Array.from(String(text || "").replace(/\s/g, "")).length / 450)) + " 分鐘";
+  }
+  function createMeasuredPage(chapter, chapterNumber, isFirst) {
+    const page = make("section", "immersive-page");
+    const content = make("div", "immersive-content");
+    if (isFirst) {
+      const heading = make("header", "immersive-heading");
+      heading.append(make("p", "immersive-number", "CHAPTER " + String(chapterNumber).padStart(2, "0")));
+      heading.append(make("h1", "immersive-title", chapter.title));
+      heading.append(make("div", "immersive-meta", chapterTextParts(chapter.text).length + " 個段落　·　" + chapterMinutes(chapter.text)));
+      content.append(heading);
+    }
+    const prose = make("article", "immersive-prose");
+    const footer = make("footer", "immersive-footer");
+    footer.append(make("span", "", activeBook ? activeBook.name : "夜頁"), make("span", "", "第 999 / 999 頁"));
+    content.append(prose, footer);
+    page.append(content);
+    return {page:page, prose:prose};
+  }
+  function fitsInPage(chapter, chapterNumber, pageNumber, existing, candidate) {
+    const measured = createMeasuredPage(chapter, chapterNumber, pageNumber === 0);
+    existing.forEach(function(text) { measured.prose.append(make("p", "", text)); });
+    measured.prose.append(make("p", "", candidate));
+    q("pageMeasure").replaceChildren(measured.page);
+    return measured.prose.scrollHeight <= measured.prose.clientHeight + 1;
+  }
+  function paginate(chapter, chapterNumber) {
+    const paras = chapterTextParts(chapter.text);
+    if (!paras.length) paras.push("本章沒有文字內容。");
+    const pages = [];
+    let current = [];
+    let pageNumber = 0;
+    const finish = function() { pages.push(current); current = []; pageNumber += 1; };
+    paras.forEach(function(paragraph) {
+      const chars = Array.from(paragraph);
+      let offset = 0;
+      while (offset < chars.length) {
+        const cap = Math.min(1200, chars.length - offset);
+        const sample = chars.slice(offset, offset + cap).join("");
+        if (fitsInPage(chapter, chapterNumber, pageNumber, current, sample)) {
+          current.push(sample);
+          offset += cap;
+          continue;
+        }
+        let low = 0, high = cap;
+        while (low < high) {
+          const mid = Math.ceil((low + high) / 2);
+          if (fitsInPage(chapter, chapterNumber, pageNumber, current, chars.slice(offset, offset + mid).join(""))) low = mid;
+          else high = mid - 1;
+        }
+        if (low) {
+          current.push(chars.slice(offset, offset + low).join(""));
+          offset += low;
+          if (offset < chars.length) finish();
+        } else if (current.length) {
+          finish();
+        } else {
+          current.push(chars[offset]);
+          offset += 1;
+          if (offset < chars.length) finish();
+        }
+      }
+    });
+    if (current.length || !pages.length) finish();
+    return pages;
+  }
+  function positionPages() {
+    const width = q("immersiveReader").clientWidth || window.innerWidth;
+    q("pageStrip").style.transform = "translate3d(" + (-activePage * width) + "px,0,0)";
+  }
+  function renderEmpty() {
+    q("pageStrip").replaceChildren();
+    const page = make("section", "immersive-page");
+    const content = make("div", "immersive-content");
+    const empty = make("div", "immersive-empty");
+    empty.append(make("h1", "", "書架目前沒有小說"));
+    empty.append(make("p", "", "載入 TXT 後，小說會保存在手機裡，離線也能閱讀。"));
+    const button = make("button", "primary-button", "載入 TXT 小說");
+    button.type = "button";
+    button.addEventListener("click", function() { el.fileInput.click(); });
+    empty.append(button);
+    content.append(empty);
+    page.append(content);
+    q("pageStrip").append(page);
+    q("apkCurrentBook").textContent = "尚未選擇小說";
+    renderedPages = [[]];
+    activePage = 0;
+    positionPages();
+  }
+  async function renderChapter(keepPage) {
+    if (!activeBook) { renderEmpty(); return; }
+    const sequence = ++renderSequence;
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (error) {}
+    await new Promise(function(resolve) { requestAnimationFrame(function() { requestAnimationFrame(resolve); }); });
+    if (sequence !== renderSequence || !activeBook) return;
+    const chapter = activeBook.chapters[chapterIndex];
+    renderedPages = paginate(chapter, chapterIndex + 1);
+    activePage = keepPage ? Math.min(activePage, renderedPages.length - 1) : 0;
+    q("pageStrip").replaceChildren();
+    renderedPages.forEach(function(parts, index) {
+      const built = createMeasuredPage(chapter, chapterIndex + 1, index === 0);
+      parts.forEach(function(text) { built.prose.append(make("p", "", text)); });
+      w012DecorateFooter(built.page, chapter, index, renderedPages.length);
+      q("pageStrip").append(built.page);
+    });
+    q("apkCurrentBook").textContent = activeBook.name;
+    positionPages();
+    drawChapterList();
+    savePositionSoon();
+  }
+  function scheduleReflow() {
+    window.clearTimeout(reflowTimer);
+    reflowTimer = window.setTimeout(function() { renderChapter(true); }, 170);
+  }
+  function savePositionSoon() {
+    if (!activeBook) return;
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(function() {
+      const position = {chapter:chapterIndex, page:activePage};
+      activeBook.lastPosition = position;
+      writeRecord("position", activeBook.id, position).catch(function() {});
+      writeRecord("library", activeBook.id, activeBook).catch(function() {});
+    }, 280);
+  }
+  async function turnPage(next) {
+    if (!activeBook) return;
+    if (next < 0) {
+      if (chapterIndex > 0) {
+        chapterIndex--;
+        await renderChapter(false);
+        activePage = renderedPages.length - 1;
+      } else activePage = 0;
+    } else if (next >= renderedPages.length) {
+      if (chapterIndex < activeBook.chapters.length - 1) {
+        chapterIndex++;
+        activePage = 0;
+        await renderChapter(false);
+      } else setMessage("已讀到本書最後");
+    } else activePage = next;
+    positionPages();
+    drawChapterList();
+    savePositionSoon();
+  }
+  function drawChapterList() {
+    const list = q("apkChapterList");
+    list.replaceChildren();
+    if (!activeBook) return;
+    q("apkChapterBook").textContent = activeBook.name;
+    activeBook.chapters.forEach(function(chapter, index) {
+      const button = make("button", "apk-chapter" + (index === chapterIndex ? " active" : ""));
+      button.type = "button";
+      button.append(make("span", "", String(index + 1).padStart(2, "0")), make("span", "", chapter.title));
+      button.addEventListener("click", async function() {
+        chapterIndex = index;
+        activePage = 0;
+        hidePanels();
+        await renderChapter(false);
+        savePositionSoon();
+      });
+      list.append(button);
+    });
+  }
+  async function storeBook(record) {
+    record.updatedAt = Date.now();
+    await writeRecord("library", record.id, record);
+    const index = libraryBooks.findIndex(function(item) { return item.id === record.id; });
+    if (index < 0) libraryBooks.push(record);
+    else libraryBooks[index] = record;
+  }
+  function drawShelf() {
+    const list = q("apkBookList");
+    list.replaceChildren();
+    if (!libraryBooks.length) {
+      const empty = make("div", "empty-search");
+      empty.style.cssText = "padding:22px;text-align:center;color:#aaa;line-height:1.8";
+      empty.textContent = "書架是空的。載入 TXT 後，小說會保存在這台手機。";
+      list.append(empty);
+      return;
+    }
+    libraryBooks.slice().sort(function(a,b) { return (b.updatedAt || 0) - (a.updatedAt || 0); }).forEach(function(record) {
+      const card = make("article", "apk-book" + (activeBook && activeBook.id === record.id ? " apk-book-current" : ""));
+      const open = make("button", "apk-book-open");
+      open.type = "button";
+      open.append(make("span", "apk-book-name", record.name), make("span", "apk-book-meta", record.chapters.length + " 章 · " + (record.source === "內建試讀" ? "內建試讀" : "TXT")));
+      open.addEventListener("click", function() { chooseBook(record.id); });
+      const actions = make("div", "apk-book-actions");
+      const rename = make("button", "apk-small", "改名");
+      rename.type = "button";
+      rename.addEventListener("click", function() { renameId = record.id; q("apkRenameInput").value = record.name; q("apkRenameDialog").showModal(); });
+      const remove = make("button", "apk-small apk-remove", "移除");
+      remove.type = "button";
+      remove.setAttribute("aria-label", "移除 " + record.name);
+      remove.addEventListener("click", function() { removeBook(record.id); });
+      actions.append(rename, remove);
+      card.append(open, actions);
+      list.append(card);
+    });
+  }
+  async function chooseBook(id) {
+    const record = libraryBooks.find(function(item) { return item.id === id; });
+    if (!record) return;
+    activeBook = record;
+    book = record;
+    chapterIndex = Math.max(0, Math.min(record.chapters.length - 1, Number(record.lastPosition && record.lastPosition.chapter) || 0));
+    activePage = Math.max(0, Number(record.lastPosition && record.lastPosition.page) || 0);
+    try {
+      const position = await readRecord("position", record.id);
+      if (position) {
+        chapterIndex = Math.max(0, Math.min(record.chapters.length - 1, Number(position.chapter) || 0));
+        activePage = Math.max(0, Number(position.page) || 0);
+      }
+    } catch (error) {}
+    localStorage.setItem("yeye-current-book", record.id);
+    hidePanels();
+    await renderChapter(true);
+    setMessage("已開啟 " + record.name);
+  }
+  async function removeBook(id) {
+    await removeLibraryRecord(id);
+    libraryBooks = libraryBooks.filter(function(record) { return record.id !== id; });
+    if (activeBook && activeBook.id === id) {
+      if (libraryBooks.length) {
+        activeBook = libraryBooks[0]; book = activeBook;
+        chapterIndex = 0; activePage = 0;
+        localStorage.setItem("yeye-current-book", activeBook.id);
+        await renderChapter(false);
+      } else {
+        activeBook = null; book = null;
+        localStorage.removeItem("yeye-current-book");
+        renderEmpty();
+      }
+    }
+    drawShelf();
+    setMessage("已從書架移除小說");
+  }
+  function removeLibraryRecord(id) {
+    return getDb().then(function(db) { return new Promise(function(resolve,reject) {
+      const tx = db.transaction(["library","position"], "readwrite");
+      tx.objectStore("library").delete(id); tx.objectStore("position").delete(id);
+      tx.oncomplete = resolve; tx.onerror = function() { reject(tx.error); };
+    }); });
+  }
+  q("apkRenameForm").addEventListener("submit", async function(event) {
+    event.preventDefault();
+    const name = q("apkRenameInput").value.trim();
+    const record = libraryBooks.find(function(item) { return item.id === renameId; });
+    if (!name || !record) return;
+    record.name = name;
+    if (activeBook && activeBook.id === record.id) { activeBook.name = name; book.name = name; }
+    await storeBook(record);
+    q("apkRenameDialog").close();
+    renameId = null;
+    drawShelf();
+    if (activeBook) await renderChapter(true);
+    setMessage("書名已更新");
+  });
+  loadFile = async function(file) {
+    if (!file || (!/\.(txt|text)$/i.test(file.name) && file.type !== "text/plain")) { setMessage("請選擇 TXT 純文字檔"); return; }
+    try {
+      const text = await decodeFile(file);
+      if (!text.trim()) { setMessage("這個檔案沒有文字內容"); return; }
+      const record = {id:"book-" + Date.now() + "-" + Math.random().toString(36).slice(2),name:file.name.replace(/\.(txt|text)$/i, "") || "未命名小說",source:"TXT 檔案",chapters:parseTxt(text),lastPosition:{chapter:0,page:0},updatedAt:Date.now()};
+      await storeBook(record);
+      activeBook = record; book = record; chapterIndex = 0; activePage = 0;
+      localStorage.setItem("yeye-library-initialized", "1");
+      localStorage.setItem("yeye-current-book", record.id);
+      hidePanels();
+      await renderChapter(false);
+      setMessage("已載入 " + record.name + "，偵測到 " + record.chapters.length + " 章");
+    } catch (error) { setMessage("無法讀取或儲存 TXT，請確認它是純文字檔且手機空間足夠"); }
+    finally { el.fileInput.value = ""; }
+  };
+  openChapter = function(index, scrollToTop, shouldAnnounce) {
+    if (!activeBook || index < 0 || index >= activeBook.chapters.length) return;
+    chapterIndex = index; activePage = 0; renderChapter(false);
+    if (shouldAnnounce !== false) setMessage("已開啟 " + activeBook.chapters[index].title);
+  };
+  function openColor(value, ink) { settings.background = value; settings.text = ink; applySettings(); }
+  document.querySelectorAll("[data-apk-bg]").forEach(function(button) {
+    button.addEventListener("click", function() { openColor(button.dataset.apkBg, button.dataset.apkInk); });
+  });
+  q("apkBgColor").addEventListener("input", function(event) {
+    settings.background = event.target.value.toLowerCase();
+    settings.text = contrastFor(settings.background);
+    applySettings();
+  });
+  q("apkTextColor").addEventListener("input", function(event) { settings.text = event.target.value.toLowerCase(); applySettings(); });
+  q("apkFont").addEventListener("change", function(event) { settings.font = event.target.value; applySettings(); });
+  q("apkSize").addEventListener("input", function(event) { settings.size = Number(event.target.value); applySettings(); });
+  q("apkLeading").addEventListener("input", function(event) { settings.leading = Number(event.target.value); applySettings(); });
+  q("apkReset").addEventListener("click", function() { settings = Object.assign({}, defaults); applySettings(); });
+  const originalApplySettings = applySettings;
+  applySettings = function() {
+    originalApplySettings();
+    document.documentElement.style.setProperty("--reader-font", fontMap[settings.font] || fontMap.serif);
+    q("apkBgColor").value = settings.background;
+    q("apkTextColor").value = settings.text;
+    q("apkFont").value = settings.font;
+    q("apkSize").value = String(settings.size);
+    q("apkSizeValue").textContent = settings.size + " px";
+    q("apkLeading").value = String(settings.leading);
+    q("apkLeadingValue").textContent = Number(settings.leading).toFixed(2);
+    document.querySelectorAll("[data-apk-bg]").forEach(function(button) {
+      button.setAttribute("aria-pressed", String(button.dataset.apkBg.toLowerCase() === settings.background.toLowerCase()));
+    });
+    scheduleReflow();
+  };
+  q("apkScrim").addEventListener("click", hidePanels);
+  document.querySelectorAll("[data-apk-close]").forEach(function(button) { button.addEventListener("click", hidePanels); });
+  q("apkOpenShelf").addEventListener("click", function() { showPanel("shelf"); });
+  q("apkOpenChapters").addEventListener("click", function() { showPanel("chapters"); });
+  q("apkOpenSettings").addEventListener("click", function() { showPanel("settings"); });
+  q("apkOpenFile").addEventListener("click", function() { hidePanels(); el.fileInput.click(); });
+  q("immersiveReader").addEventListener("pointerdown", function(event) {
+    if (event.isPrimary === false) return;
+    pointerStart = {x:event.clientX,y:event.clientY,time:Date.now()};
+  });
+  q("immersiveReader").addEventListener("pointerup", function(event) {
+    if (!pointerStart) return;
+    const dx = event.clientX - pointerStart.x, dy = event.clientY - pointerStart.y;
+    const elapsed = Date.now() - pointerStart.time;
+    pointerStart = null;
+    if (Math.max(Math.abs(dx),Math.abs(dy)) > 55) {
+      if (dy > 62 && dy > Math.abs(dx) * 1.15) { showControls(); return; }
+      if (dy < -65 && Math.abs(dy) > Math.abs(dx) * 1.2) { hidePanels(); return; }
+      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2) { turnPage(dx < 0 ? activePage - 1 : activePage + 1); return; }
+      return;
+    }
+    if (elapsed < 650) turnPage(activePage + 1);
+  });
+  q("immersiveReader").addEventListener("pointercancel", function() { pointerStart = null; });
+  q("immersiveReader").addEventListener("contextmenu", function(event) { event.preventDefault(); });
+  window.addEventListener("resize", function() { positionPages(); scheduleReflow(); });
+  document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") hidePanels();
+    if (event.key === "ArrowRight") { event.preventDefault(); turnPage(activePage + 1); }
+    if (event.key === "ArrowLeft") { event.preventDefault(); turnPage(activePage - 1); }
+  });
+  document.addEventListener("visibilitychange", function() { if (document.hidden) savePositionSoon(); });
+  async function getAllBooks() {
+    const db = await getDb();
+    return new Promise(function(resolve,reject) {
+      const request = db.transaction("library","readonly").objectStore("library").getAll();
+      request.onsuccess = function() { resolve(request.result || []); };
+      request.onerror = function() { reject(request.error); };
+    });
+  }
+  async function initializeApkReader() {
+    try {
+      libraryBooks = await getAllBooks();
+      if (!libraryBooks.length && !localStorage.getItem("yeye-library-initialized")) {
+        const legacy = await readRecord("books", "current");
+        if (legacy && Array.isArray(legacy.chapters) && legacy.chapters.length) {
+          const oldPosition = await readRecord("position", "current").catch(function() { return null; });
+          const migrated = {id:"legacy-current",name:legacy.name || "已載入小說",source:legacy.source || "TXT 檔案",chapters:legacy.chapters,lastPosition:{chapter:Number(oldPosition && oldPosition.chapter) || 0,page:0},updatedAt:Date.now()};
+          await storeBook(migrated);
+        } else {
+          await storeBook({id:"demo-original",name:demo.name,source:demo.source,chapters:demo.chapters,lastPosition:{chapter:0,page:0},updatedAt:Date.now()});
+        }
+        localStorage.setItem("yeye-library-initialized", "1");
+      }
+      libraryBooks = await getAllBooks();
+      const selectedId = localStorage.getItem("yeye-current-book");
+      const selected = libraryBooks.find(function(record) { return record.id === selectedId; }) || libraryBooks[0];
+      if (selected) await chooseBook(selected.id);
+      else renderEmpty();
+    } catch (error) {
+      setMessage("無法開啟本機書架");
+      renderEmpty();
+    }
+  }
+  applySettings();
+function w012DecorateFooter(page, chapter, pageIndex, pageCount) {
+    const footer = page.querySelector(".immersive-footer");
+    if (!footer) return;
+    footer.replaceChildren();
+    footer.append(make("span", "w012-book", activeBook ? activeBook.name : "夜頁"));
+    footer.append(make("span", "w012-chapter", chapter ? chapter.title : ""));
+    const prev = make("button", "w012-nav-chapter", "上一章");
+    prev.type = "button";
+    prev.disabled = !activeBook || chapterIndex <= 0;
+    prev.addEventListener("click", function(event) {
+      event.stopPropagation();
+      if (chapterIndex > 0) openChapter(chapterIndex - 1, true);
+    });
+    const next = make("button", "w012-nav-chapter", "下一章");
+    next.type = "button";
+    next.disabled = !activeBook || chapterIndex >= activeBook.chapters.length - 1;
+    next.addEventListener("click", function(event) {
+      event.stopPropagation();
+      if (activeBook && chapterIndex < activeBook.chapters.length - 1) openChapter(chapterIndex + 1, true);
+    });
+    footer.append(prev, next, make("span", "w012-page", "第 " + (pageIndex + 1) + " / " + pageCount + " 頁"));
+  }
+  window.__yeye = {
+    importText: async function(name, text) {
+      const existing = libraryBooks.find(function(b) { return b.name === name && b.source === "內建小說"; });
+      if (existing) { await chooseBook(existing.id); return "existing"; }
+      const record = { id: "builtin-" + name, name: name, source: "內建小說", chapters: parseTxt(text), lastPosition: { chapter: 0, page: 0 }, updatedAt: Date.now() };
+      await storeBook(record);
+      activeBook = record; book = record; chapterIndex = 0; activePage = 0;
+      localStorage.setItem("yeye-current-book", record.id);
+      await renderChapter(false);
+      setMessage("已載入 " + name);
+      return "imported";
+    },
+    openAt: function(index) {
+      if (!activeBook) return Promise.resolve();
+      chapterIndex = Math.max(0, Math.min(activeBook.chapters.length - 1, Number(index) || 0));
+      activePage = 0;
+      return renderChapter(false);
+    },
+    showPanel: showPanel,
+    hidePanels: hidePanels,
+    step: function(delta) { return turnPage(activePage + delta); },
+    reflow: function() { return activeBook ? renderChapter(true) : Promise.resolve(); },
+    state: function() {
+      return {
+        chapterIndex: chapterIndex,
+        chapterTitle: activeBook && activeBook.chapters[chapterIndex] ? activeBook.chapters[chapterIndex].title : "",
+        chapterCount: activeBook ? activeBook.chapters.length : 0,
+        pages: renderedPages.length,
+        activePage: activePage
+      };
+    }
+  };
+  initializeApkReader().then(function() { window.__yeyeReady = true; });
+  window.setTimeout(function() { document.body.classList.add("hint-visible"); }, 500);
+  window.setTimeout(function() { document.body.classList.remove("hint-visible"); }, 4200);
+})();
+</script>
+<div id="w012Arrows">
+    <button id="w012Prev" type="button" aria-label="上一頁" title="上一頁">‹</button>
+    <button id="w012Next" type="button" aria-label="下一頁" title="下一頁">›</button>
+  </div>
+  <aside id="w012Rail" aria-label="閱讀功能欄">
+    <button class="w012-btn" id="w012Toc" type="button" title="章節" aria-label="章節">☷</button>
+    <button class="w012-btn" id="w012Shelf" type="button" title="書架" aria-label="書架">▤</button>
+    <button class="w012-btn" id="w012Settings" type="button" title="閱讀設定" aria-label="閱讀設定">Aa</button>
+    <button class="w012-btn" id="w012Open" type="button" title="載入本機 TXT" aria-label="載入本機 TXT">＋</button>
+    <span class="w012-spacer"></span>
+    <a class="w012-btn" id="w012Back" href="../creative/novel/" title="回小說介紹" aria-label="回小說介紹">←</a>
+    <span class="w012-rail-label">夜頁</span>
+  </aside>
+  <script id="w012-rail">
+  (function() {
+    var TITLES = { qixun: '七尋', xiaoshi: '消失的士兵', xiangfeng: '向風的地方' };
+    function byId(id) { return document.getElementById(id); }
+    byId('w012Toc').addEventListener('click', function() { if (window.__yeye) window.__yeye.showPanel('chapters'); });
+    byId('w012Shelf').addEventListener('click', function() { if (window.__yeye) window.__yeye.showPanel('shelf'); });
+    byId('w012Settings').addEventListener('click', function() { if (window.__yeye) window.__yeye.showPanel('settings'); });
+    byId('w012Open').addEventListener('click', function() { var f = byId('fileInput'); if (f) f.click(); });
+
+    // 左右箭頭：翻頁（跨章時自動換章）
+    function refreshArrows() {
+      if (!window.__yeye) return;
+      var s = window.__yeye.state();
+      var prev = byId('w012Prev'), next = byId('w012Next');
+      if (!prev || !next) return;
+      prev.disabled = s.chapterIndex === 0 && s.activePage === 0;
+      next.disabled = (s.chapterIndex >= s.chapterCount - 1) && (s.activePage >= s.pages - 1);
+    }
+    byId('w012Prev').addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (window.__yeye) Promise.resolve(window.__yeye.step(-1)).then(refreshArrows);
+    });
+    byId('w012Next').addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (window.__yeye) Promise.resolve(window.__yeye.step(1)).then(refreshArrows);
+    });
+    document.addEventListener('keyup', function() { setTimeout(refreshArrows, 60); });
+    setInterval(refreshArrows, 700);
+
+    // 抽屜打開時：正文往右推（桌機），並重新分頁；關閉後還原
+    var dockState = false;
+    function syncDock() {
+      var open = /apk-(controls|shelf|chapters|settings)-open/.test(document.body.className);
+      if (open === dockState) return;
+      dockState = open;
+      document.body.classList.toggle('w012-dock-open', open);
+      if (window.__yeye && window.__yeye.reflow) window.__yeye.reflow();
+    }
+    new MutationObserver(syncDock).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    // 面板內的「收起」按鈕改為關閉抽屜
+    document.querySelectorAll('.apk-panel-head h2').forEach(function(h) {
+      if (h.dataset.w012) return;
+      h.dataset.w012 = '1';
+      h.addEventListener('dblclick', function() { if (window.__yeye) window.__yeye.hidePanels(); });
+    });
+
+    var params = new URLSearchParams(location.search);
+    var key = params.get('book');
+    var chapter = params.get('c');
+    function start() {
+      if (!window.__yeye || !window.__yeyeReady) { setTimeout(start, 120); return; }
+      if (!key || !TITLES[key]) return;
+      fetch('../novels/' + key + '.txt', { cache: 'force-cache' })
+        .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function(text) { return window.__yeye.importText(TITLES[key], text); })
+        .then(function() { if (chapter) return window.__yeye.openAt(parseInt(chapter, 10) - 1); })
+        .catch(function(e) { console.warn('novel load failed', e); });
+    }
+    start();
+  })();
+  </script>
+</body>
+</body>
+</html>
+
