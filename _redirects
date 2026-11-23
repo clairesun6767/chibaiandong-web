@@ -1,0 +1,10 @@
+# 舊網址 301 對照表
+# 舊站是 WordPress 單頁（全部錨點），沒有內頁需要轉址。
+# 切換前確認：Search Console 舊網址清單、外部報導連結、Google 商家網站欄位。
+# 格式：/舊路徑  /新路徑  301
+# 以下為本專案骨架期間改版過的網址（尚未對外公開，先行保留）
+
+/creative/rough-seas        /videos/          301
+/creative/beyond-embrasure  /videos/          301
+/creative/qixun             /creative/novel/  301
+/creative/veterans          /creative/        301
